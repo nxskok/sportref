@@ -1,0 +1,109 @@
+get college bball scores from sports-reference.com
+
+packages
+
+```{r}
+library(tidyverse)
+library(rvest)
+library(glue)
+library(lubridate)
+library(conflicted)
+conflict_prefer("filter", "dplyr")
+source("ncaab_functions.R")
+```
+
+```{r}
+ncaab_2018 <- these_dates("2017-11-05", "2018-04-03")
+```
+
+```{r}
+ncaab_2018
+write_rds(ncaab_2018, "ncaab_2018.rds")
+```
+
+big east
+
+```{r}
+teams <- "
+team
+Villanova
+Creighton
+Connecticut
+St. John's (NY)
+Seton Hall
+Providence
+Xavier
+Georgetown
+Marquette
+Butler
+DePaul
+"
+read_csv(teams) %>% pull(team) -> myteams
+myteams
+```
+
+```{r}
+ncaab_2018 %>% filter(t1 %in% myteams, t2 %in% myteams) -> big_east
+big_east
+write_rds(big_east, "big_east_2018.rds")
+```
+
+```{r}
+big_east %>% count(t2)
+```
+
+
+make some dates
+
+```{r}
+tibble(date = seq(as.Date("2021-03-01"), as.Date("2021-03-10"), "days")) %>% 
+  rowwise() %>% 
+  mutate(game_scores = list(date_to_df(date))) -> d
+d %>% 
+  unnest(game_scores)
+```
+
+
+
+```{r}
+date_to_df(2021, 2, 17)
+```
+
+
+
+jottings
+
+get one day
+
+```{r}
+the_url <- "https://www.sports-reference.com/cbb/boxscores/index.cgi?month=03&day=18&year=2021"
+html <- read_html(the_url)
+```
+
+try to extract scores
+
+```{r}
+html %>% 
+  html_nodes("table.teams") %>% 
+  map(~html_nodes(., "td")) -> scores
+scores
+```
+
+write a function that takes one game and makes a one-row df of info needed
+
+```{r}
+game_info <- function(nodes) {
+  nodes[1] %>% html_nodes("a") %>% html_text() -> t1
+  nodes[2] %>% html_text() %>% as.numeric() -> s1
+  nodes[4] %>% html_nodes("a") %>% html_text() -> t2
+  nodes[5] %>% html_text() %>% as.numeric() -> s2
+  tibble(t1 = t1, t2 = t2, s1 = s1, s2 = s2)
+}
+game_info(scores[[4]])
+```
+
+```{r}
+map(scores, ~game_info(.)) %>% 
+  bind_rows()
+```
+
